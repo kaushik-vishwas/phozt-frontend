@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Content = ({ contentData, onUpdate, disabled = false }) => {
+const ServiceContent = ({ contentData, onUpdate, disabled = false }) => {
     const [mainContent, setMainContent] = useState(contentData.mainContent || '');
     const [h2Headings, setH2Headings] = useState(contentData.h2Headings || []);
     const [h3Headings, setH3Headings] = useState(contentData.h3Headings || []);
@@ -211,4 +211,4 @@ const Content = ({ contentData, onUpdate, disabled = false }) => {
     );
 };
 
-export default Content;
+export default ServiceContent;

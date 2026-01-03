@@ -1,7 +1,7 @@
 // frontend/components/Page HomePage/OtherVendorsTab.jsx
 import React, { useState, useEffect } from "react";
 import { PlusIcon, MagnifyingGlassIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
-import AddVendorCard from "./AddVendorCard";
+import AddVendorCard from "./AddServiceVendorCard";
 
 const VendorCard = ({ vendor, selected, onDelete, onEdit, index }) => {
   return (

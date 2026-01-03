@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { apiAddBlockToHomePage, apiUpdateBlockInHomePage } from '../../service/api';
 
-const AddNewCard = ({ onClose, onSave, initialData = null, editMode = false, homePageId, blockId }) => {
+const AddNewServiceCard = ({ onClose, onSave, initialData = null, editMode = false, homePageId, blockId }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         serviceName: initialData?.serviceName || '',
@@ -27,9 +27,9 @@ const AddNewCard = ({ onClose, onSave, initialData = null, editMode = false, hom
             newErrors.serviceName = 'Service name is required';
         }
         
-        // if (formData.linkPage && !isValidUrl(formData.linkPage)) {
-        //     newErrors.linkPage = 'Please enter a valid URL (including http:// or https://)';
-        // }
+        if (formData.linkPage && !isValidUrl(formData.linkPage)) {
+            newErrors.linkPage = 'Please enter a valid URL (including http:// or https://)';
+        }
         
         if (!editMode && !formData.imageUrl && !formData.imageFile) {
             newErrors.image = 'Please upload an image';
@@ -118,47 +118,77 @@ const AddNewCard = ({ onClose, onSave, initialData = null, editMode = false, hom
         }
     };
 
-const handleSave = async () => {
-  if (!validateForm()) {
-    return;
-  }
+    const handleSave = async () => {
+        if (!validateForm()) {
+            return;
+        }
 
-  // For direct saving (when creating/editing homepage)
-  onSave({
-    serviceName: formData.serviceName.trim(),
-    serviceDescription: formData.serviceDescription.trim(),
-    linkPage: formData.linkPage.trim(),
-    imageUrl: formData.imageUrl,
-    imageFile: formData.imageFile // Pass the file object
-  });
-  onClose();
-};
-// In the render, when showing image preview:
-{formData.imagePreview && (
-  <div className="relative inline-block">
-    <div className="w-48 h-48 border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-      <img 
-        src={formData.imagePreview} 
-        alt="Preview" 
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = 'https://via.placeholder.com/400x300?text=Image+Error';
-        }}
-      />
-    </div>
-    {!loading && (
-      <button
-        type="button"
-        onClick={handleRemoveImage}
-        disabled={loading}
-        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors text-xs"
-      >
-        ✕
-      </button>
-    )}
-  </div>
-)}
+        setLoading(true);
+
+        try {
+            // Prepare FormData
+            const formDataToSend = new FormData();
+            
+            // Add text fields
+            formDataToSend.append('serviceName', formData.serviceName.trim());
+            formDataToSend.append('serviceDescription', formData.serviceDescription.trim());
+            formDataToSend.append('linkPage', formData.linkPage.trim());
+            
+            // If we have an existing image URL in edit mode, append it
+            if (editMode && formData.imageUrl && !formData.imageFile) {
+                formDataToSend.append('imageUrl', formData.imageUrl);
+            }
+            
+            // If we have a new image file, append it
+            if (formData.imageFile) {
+                formDataToSend.append('image', formData.imageFile);
+            }
+
+            let response;
+            
+            if (editMode && homePageId && blockId) {
+                // Update existing block
+                response = await apiUpdateBlockInHomePage(homePageId, blockId, formDataToSend);
+            } else if (homePageId) {
+                // Add new block
+                response = await apiAddBlockToHomePage(homePageId, formDataToSend);
+            } else {
+                // Local save (for immediate UI update)
+                onSave({
+                    serviceName: formData.serviceName.trim(),
+                    serviceDescription: formData.serviceDescription.trim(),
+                    linkPage: formData.linkPage.trim(),
+                    imageUrl: formData.imageUrl || (formData.imageFile ? URL.createObjectURL(formData.imageFile) : '')
+                });
+                onClose();
+                return;
+            }
+
+            // If API call was successful
+            if (response.data.success) {
+                // Get the HTTP URL from the response, not blob
+                const imageUrl = response.data.data?.imageUrl || 
+                               (formData.imageFile ? URL.createObjectURL(formData.imageFile) : formData.imageUrl);
+                
+                onSave({
+                    serviceName: formData.serviceName.trim(),
+                    serviceDescription: formData.serviceDescription.trim(),
+                    linkPage: formData.linkPage.trim(),
+                    imageUrl: imageUrl
+                });
+                onClose();
+            } else {
+                throw new Error(response.data.message || 'Failed to save block');
+            }
+            
+        } catch (error) {
+            console.error('Error saving block:', error);
+            alert(error.message || 'Failed to save block. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6 p-1">
             <div className="flex items-center justify-between">
@@ -201,7 +231,7 @@ const handleSave = async () => {
                     Link Page
                 </label>
                 <input
-                    type="text"
+                    type="url"
                     placeholder="https://example.com/service"
                     value={formData.linkPage}
                     onChange={(e) => handleInputChange('linkPage', e.target.value)}
@@ -213,9 +243,9 @@ const handleSave = async () => {
                 {errors.linkPage && (
                     <p className="text-red-500 text-xs mt-1">{errors.linkPage}</p>
                 )}
-                {/* <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                     Optional. URL to link this service card to a specific page. Must include http:// or https://
-                </p> */}
+                </p>
             </div>
 
             {/* Service Description */}
@@ -358,4 +388,4 @@ const handleSave = async () => {
     );
 };
 
-export default AddNewCard;
+export default AddNewServiceCard;

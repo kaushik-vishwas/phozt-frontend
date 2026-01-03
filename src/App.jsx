@@ -11,6 +11,7 @@ import PagesManagementDashboard from "./pages/PagesManagement/PagesManagementDas
 import KnowUs from "./../src/components/Page Management/KnowUs";
 import ServicesList from "./pages/PagesManagement/ServicesList";
 import HomePages from "./pages/PagesManagement/HomePages";
+import ServicePages from "./pages/PagesManagement/ServicePages";
 import VendorMain from "./pages/Vendors/VendorMain";
 import CreateVendorGroup from "./pages/Vendors/CreateVendorGroup";
 import CategoryDetail from "./pages/Vendors/CategoryDetail";
@@ -28,6 +29,7 @@ import VendorDashboard from "./pages/VendorLogin/VendorDashboard";
 import VendorInfo from "./pages/VendorLogin/VendorInfo";
 import VendorPortfolio from "./pages/VendorLogin/VendorPortfolio";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import DropdownManagement from "./pages/PagesManagement/DropdownManagement"
 
 export default function App() {
   const { isAuthenticated } = useSelector((state) => state.admin);
@@ -98,6 +100,15 @@ export default function App() {
             </ProtectedAdminRoute>
           } 
         />
+
+          <Route 
+          path="/dropdown-management" 
+          element={
+            <ProtectedAdminRoute>
+              <DropdownManagement />
+            </ProtectedAdminRoute>
+          } 
+        />
         <Route 
           path="/services-list" 
           element={
@@ -119,6 +130,15 @@ export default function App() {
           element={
             <ProtectedAdminRoute>
               <HomePages />
+            </ProtectedAdminRoute>
+          } 
+        />
+
+         <Route 
+          path="/service-page" 
+          element={
+            <ProtectedAdminRoute>
+              <ServicePages />
             </ProtectedAdminRoute>
           } 
         />

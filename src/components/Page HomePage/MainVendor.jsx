@@ -1,7 +1,7 @@
-// frontend/components/Page HomePage/OtherVendorsTab.jsx
+// frontend/components/Page HomePage/MainVendor.jsx
 import React, { useState, useEffect } from "react";
-import { PlusIcon, MagnifyingGlassIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
-import AddVendorCard from "./AddVendorCard";
+import { PlusIcon, MagnifyingGlassIcon, TrashIcon, PencilSquareIcon, StarIcon } from "@heroicons/react/24/outline";
+import AddVendorCard from "./AddServiceVendorCard";
 
 const VendorCard = ({ vendor, selected, onDelete, onEdit, index }) => {
   return (
@@ -52,7 +52,9 @@ const VendorBlock = ({
   onAddCard, 
   onEditCard,
   onDeleteBlock,
-  onDeleteCard
+  onDeleteCard,
+  isMainSection,
+  onSetAsMain
 }) => {
   const [showAddVendorCard, setShowAddVendorCard] = useState(false);
   const [editingCardIndex, setEditingCardIndex] = useState(null);
@@ -88,20 +90,45 @@ const VendorBlock = ({
   };
 
   return (
-    <div className="space-y-6 border rounded-lg p-6 bg-gray-50">
+    <div className={`space-y-6 border rounded-lg p-6 ${isMainSection ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}>
       {/* Block Header */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">
-          Section {block.id}
-        </h3>
-        {onDeleteBlock && (
-          <button
-            onClick={onDeleteBlock}
-            className="text-gray-400 hover:text-red-600"
-          >
-            <TrashIcon className="h-5 w-5" />
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-medium text-gray-900">
+            Section {block.id}
+          </h3>
+          {isMainSection && (
+            <span className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+              <StarIcon className="h-3 w-3" />
+              Main Section
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          {/* Radio button to mark as main section */}
+          <div className="flex items-center">
+            <input
+              type="radio"
+              id={`main-section-${block.id}`}
+              name="main-section"
+              checked={isMainSection}
+              onChange={() => onSetAsMain(block.id)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+            />
+            <label htmlFor={`main-section-${block.id}`} className="ml-2 text-sm text-gray-700">
+              Set as main
+            </label>
+          </div>
+          
+          {onDeleteBlock && (
+            <button
+              onClick={onDeleteBlock}
+              className="text-gray-400 hover:text-red-600"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Heading + Sub Service */}
@@ -217,7 +244,7 @@ const VendorBlock = ({
   );
 };
 
-const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
+const MainVendor = ({ otherVendorsData, onUpdate, disabled }) => {
   const [blocks, setBlocks] = useState(() => {
     // Initialize blocks from props or create default
     if (otherVendorsData && otherVendorsData.length > 0) {
@@ -225,14 +252,16 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
         id: index + 1,
         heading: section.title || "",
         service: section.selectedService || "",
-        cards: section.vendors || []
+        cards: section.vendors || [],
+        isMain: section.isMain || false
       }));
     }
     return [{
       id: 1,
       heading: "",
       service: "",
-      cards: []
+      cards: [],
+      isMain: true // First section is main by default
     }];
   });
   
@@ -244,6 +273,7 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
       title: block.heading,
       selectedService: block.service,
       searchQuery: "",
+      isMain: block.isMain, // Add isMain field
       vendors: block.cards.map(card => ({
         studioName: card.studioName || "",
         studioDescription: card.studioDescription || "",
@@ -265,15 +295,25 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
       id: nextBlockId,
       heading: "",
       service: "",
-      cards: []
+      cards: [],
+      isMain: false // New blocks are not main by default
     };
     setBlocks([...blocks, newBlock]);
     setNextBlockId(nextBlockId + 1);
   };
 
   const deleteBlock = (blockId) => {
+    const blockToDelete = blocks.find(block => block.id === blockId);
+    
     if (blocks.length > 1) {
-      setBlocks(blocks.filter(block => block.id !== blockId));
+      const newBlocks = blocks.filter(block => block.id !== blockId);
+      
+      // If we deleted the main section, set the first remaining block as main
+      if (blockToDelete?.isMain && newBlocks.length > 0) {
+        newBlocks[0].isMain = true;
+      }
+      
+      setBlocks(newBlocks);
     }
   };
 
@@ -281,6 +321,13 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
     setBlocks(blocks.map(block => 
       block.id === blockId ? { ...block, [field]: value } : block
     ));
+  };
+
+  const setAsMainSection = (blockId) => {
+    setBlocks(blocks.map(block => ({
+      ...block,
+      isMain: block.id === blockId
+    })));
   };
 
   const addCardToBlock = (blockId, cardData) => {
@@ -322,7 +369,7 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Other Vendors</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Manage sections and vendor cards dynamically
+            Manage sections and vendor cards dynamically. One section can be marked as the main section.
           </p>
         </div>
         <button
@@ -346,6 +393,8 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
             onEditCard={editCardInBlock}
             onDeleteBlock={() => deleteBlock(block.id)}
             onDeleteCard={deleteCardFromBlock}
+            isMainSection={block.isMain}
+            onSetAsMain={setAsMainSection}
           />
         ))}
       </div>
@@ -365,4 +414,4 @@ const OtherVendorsTab = ({ otherVendorsData, onUpdate, disabled }) => {
   );
 };
 
-export default OtherVendorsTab;
+export default MainVendor;

@@ -1,25 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import Content from '../../components/Page HomePage/Content';
-import Seo from '../../components/Page HomePage/Seo';
-import Blocks from '../../components/Page HomePage/Blocks';
-import InternalLinks from '../../components/Page HomePage/InternalLinks';
-import OtherVendors from '../../components/Page HomePage/OtherVendors';
-import Reviews from '../../components/Page HomePage/Reviews';
-import {
-  createHomePage,
-  updateHomePage,
-  clearHomePagesError,
-  clearHomePagesSuccess
-} from '../../redux/homePageSlice';
+import Content from '../../components/Page HomePage/ServiceContent';
+import Seo from '../../components/Page HomePage/ServiceSeo';
+import InternalLinks from '../../components/Page HomePage/ServiceInternalLinks';
+import MainVendors from '../../components/Page HomePage/MainVendor';
+import Reviews from '../../components/Page HomePage/ServiceReviews';
+import { 
+  createServicePage, 
+  updateServicePage,
+  clearServicePagesError,
+  clearServicePagesSuccess,
+  fetchServicePageById
+} from '../../redux/servicePageSlice';
 import { fetchCities } from '../../redux/citiesSlice';
 import { toast } from 'react-toastify';
 
-const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
+const AddNewServicePage = ({ onClose, editMode = false, servicePageId = null }) => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { loading, error, success, message, currentHomePage } = useSelector((state) => state.homepages);
+  
+  const { loading, error, success, message, currentServicePage } = useSelector((state) => state.servicepages);
   const { cities, loading: citiesLoading } = useSelector((state) => state.cities);
 
   const [activeTab, setActiveTab] = useState('Basic Info');
@@ -29,7 +28,6 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
       slugUrl: '',
       h1Description: '',
       location: '', // This will store the city ObjectId
-      parentPage: '',
       status: 'Published',
       bannerImage: ''
     },
@@ -43,13 +41,12 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
       metaDescription: '',
       focusedKeyword: ''
     },
-    blocks: [],
     internalLinks: {
       blockName: '',
       urls: [],
       linkBlocks: []
     },
-    otherVendors: [],
+    mainVendors: [], // Only mainVendors, no subVendors or blocks
     reviews: [],
     topSearches: []
   });
@@ -58,9 +55,8 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
     'Basic Info',
     'Content',
     'SEO',
-    'Blocks',
     'Internal Links',
-    'Other Vendors',
+    'Main Vendors', // Only Main Vendors tab
     'Reviews',
     'Top Searches'
   ];
@@ -71,52 +67,73 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
   }, [dispatch]);
 
   // Load data for edit mode
-  useEffect(() => {
-    if (editMode && homePageId && currentHomePage) {
+// Load data for edit mode
+useEffect(() => {
+  if (editMode && servicePageId) {
+    if (!currentServicePage || currentServicePage._id !== servicePageId) {
+      dispatch(fetchServicePageById(servicePageId));
+    } else if (currentServicePage._id === servicePageId) {
+      // Map backend's otherVendors to frontend's mainVendors
       setFormData({
         basicInfo: {
-          pageTitle: currentHomePage.basicInfo?.pageTitle || '',
-          slugUrl: currentHomePage.basicInfo?.slugUrl || '',
-          h1Description: currentHomePage.basicInfo?.h1Description || '',
-          location: currentHomePage.basicInfo?.location || '',
-          parentPage: currentHomePage.basicInfo?.parentPage || '',
-          status: currentHomePage.basicInfo?.status || 'Published',
-          bannerImage: currentHomePage.basicInfo?.bannerImage || ''
+          pageTitle: currentServicePage.basicInfo?.pageTitle || '',
+          slugUrl: currentServicePage.basicInfo?.slugUrl || '',
+          h1Description: currentServicePage.basicInfo?.h1Description || '',
+          location: currentServicePage.basicInfo?.location || '',
+          status: currentServicePage.basicInfo?.status || 'Published',
+          bannerImage: currentServicePage.basicInfo?.bannerImage || ''
         },
-        content: currentHomePage.content || {
+        content: currentServicePage.content || {
           mainContent: '',
           h2Headings: [],
           h3Headings: []
         },
-        seo: currentHomePage.seo || {
+        seo: currentServicePage.seo || {
           metaTitle: '',
           metaDescription: '',
           focusedKeyword: ''
         },
-        blocks: currentHomePage.blocks || [],
-        internalLinks: currentHomePage.internalLinks || {
+        internalLinks: currentServicePage.internalLinks || {
           blockName: '',
           urls: [],
           linkBlocks: []
         },
-        otherVendors: currentHomePage.otherVendors || [],
-        reviews: currentHomePage.reviews || [],
-        topSearches: currentHomePage.topSearches || []
+        // Map from backend's otherVendors to frontend's mainVendors
+        mainVendors: currentServicePage.otherVendors?.map(section => ({
+          title: section.title || '',
+          selectedService: section.selectedService || '',
+          searchQuery: section.searchQuery || '',
+          isMain: section.isMain || false, // Add this line
+          vendors: section.vendors?.map(vendor => ({
+            studioName: vendor.studioName || '',
+            studioDescription: vendor.studioDescription || '',
+            eventLocation: vendor.eventLocation || '',
+            rating: vendor.rating || '',
+            pricing: vendor.pricing || '',
+            area: vendor.area || '',
+            services: Array.isArray(vendor.services) ? vendor.services : [],
+            portfolioImages: vendor.portfolioImages || [],
+            selected: vendor.selected || false
+          })) || []
+        })) || [],
+        reviews: currentServicePage.reviews || [],
+        topSearches: currentServicePage.topSearches || []
       });
     }
-  }, [editMode, homePageId, currentHomePage]);
+  }
+}, [editMode, servicePageId, currentServicePage, dispatch]);
 
   // Handle success and error messages
   useEffect(() => {
     if (error) {
       toast.error(error);
-      dispatch(clearHomePagesError());
+      dispatch(clearServicePagesError());
     }
-
+    
     if (success && message) {
       toast.success(message);
-      dispatch(clearHomePagesSuccess());
-
+      dispatch(clearServicePagesSuccess());
+      
       // Close modal after successful creation/update
       if (onClose) {
         setTimeout(() => onClose(), 1000);
@@ -161,13 +178,6 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
     }));
   };
 
-  const handleBlocksUpdate = (blocksData) => {
-    setFormData(prev => ({
-      ...prev,
-      blocks: blocksData
-    }));
-  };
-
   const handleInternalLinksUpdate = (internalLinksData) => {
     setFormData(prev => ({
       ...prev,
@@ -175,15 +185,14 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
     }));
   };
 
-  const handleOtherVendorsUpdate = (otherVendorsData) => {
+  const handleMainVendorsUpdate = (mainVendorsData) => {
     setFormData(prev => ({
       ...prev,
-      otherVendors: otherVendorsData
+      mainVendors: mainVendorsData
     }));
   };
 
   // Handle banner image upload
-  // Handle banner image upload with FormData
   const handleBannerImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -205,7 +214,7 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
     try {
       // Create a preview URL for display
       const previewUrl = URL.createObjectURL(file);
-
+      
       // Store the file object for later upload
       setFormData(prev => ({
         ...prev,
@@ -223,9 +232,6 @@ const AddNewHomePage = ({ onClose, editMode = false, homePageId = null }) => {
     }
   };
 
-  // Update handleSubmit to send FormData
-  // In your frontend handleSubmit function
-
 const handleSubmit = () => {
   if (!formData.basicInfo.pageTitle.trim()) {
     toast.error('Page title is required');
@@ -235,32 +241,44 @@ const handleSubmit = () => {
   // Create FormData
   const formDataToSend = new FormData();
 
-  // Clean the data - remove imageFile properties from blocks
-  const blocksWithoutFiles = formData.blocks.map(block => {
-    const { imageFile, ...blockWithoutFile } = block;
-    return blockWithoutFile;
-  });
-
-  // Clean otherVendors data - separate files from URLs
-  const otherVendorsWithoutFiles = formData.otherVendors.map((section, sectionIndex) => ({
-    ...section,
-    vendors: section.vendors.map((vendor, vendorIndex) => ({
-      ...vendor,
+  // Clean mainVendors data - separate files from URLs
+  const otherVendorsWithoutFiles = formData.mainVendors.map((section, sectionIndex) => ({
+    title: section.title || '',
+    selectedService: section.selectedService || '',
+    searchQuery: section.searchQuery || '',
+    isMain: section.isMain || false, // Add this line
+    vendors: section.vendors ? section.vendors.map((vendor, vendorIndex) => ({
+      studioName: vendor.studioName || '',
+      studioDescription: vendor.studioDescription || '',
+      eventLocation: vendor.eventLocation || '',
+      rating: vendor.rating || '',
+      pricing: vendor.pricing || '',
+      area: vendor.area || '',
+      services: Array.isArray(vendor.services) ? vendor.services : [],
       // Remove portfolioImages field - we'll handle it separately
       portfolioImages: vendor.portfolioImages 
         ? vendor.portfolioImages.filter(img => typeof img === 'string') 
-        : [] // Keep only URLs, not File objects
-    }))
+        : [], // Keep only URLs, not File objects
+      selected: vendor.selected || false
+    })) : []
   }));
 
   const dataToSend = {
-    ...formData,
     basicInfo: {
-      ...formData.basicInfo,
+      pageTitle: formData.basicInfo.pageTitle?.trim() || '',
+      slugUrl: formData.basicInfo.slugUrl?.trim() || '',
+      h1Description: formData.basicInfo.h1Description?.trim() || '',
+      status: formData.basicInfo.status || 'Published',
+      location: formData.basicInfo.location || '',
       bannerImage: formData.basicInfo.bannerImageFile ? '' : formData.basicInfo.bannerImage
     },
-    blocks: blocksWithoutFiles,
-    otherVendors: otherVendorsWithoutFiles
+    content: formData.content,
+    seo: formData.seo,
+    internalLinks: formData.internalLinks,
+    // Send as otherVendors (backend expects this name)
+    otherVendors: otherVendorsWithoutFiles,
+    reviews: formData.reviews,
+    topSearches: formData.topSearches
   };
 
   // Add all form data as JSON string in 'data' field
@@ -271,34 +289,28 @@ const handleSubmit = () => {
     formDataToSend.append('bannerImage', formData.basicInfo.bannerImageFile);
   }
 
-  // Add block images as separate files with naming convention blockImage0, blockImage1, etc.
-  formData.blocks.forEach((block, index) => {
-    if (block.imageFile) {
-      formDataToSend.append(`blockImage${index}`, block.imageFile);
+  // Add portfolio images from mainVendors
+  formData.mainVendors.forEach((section, sectionIndex) => {
+    if (section.vendors && Array.isArray(section.vendors)) {
+      section.vendors.forEach((vendor, vendorIndex) => {
+        // Check if vendor has portfolio image files
+        if (vendor.portfolioImages && Array.isArray(vendor.portfolioImages)) {
+          // Separate Files from strings (URLs)
+          const portfolioFiles = vendor.portfolioImages.filter(img => img instanceof File);
+          
+          // Add each portfolio image file
+          portfolioFiles.forEach((file, fileIndex) => {
+            formDataToSend.append(`otherVendor${sectionIndex}_vendor${vendorIndex}_portfolio${fileIndex}`, file);
+          });
+        }
+      });
     }
-  });
-
-  // Add other vendor portfolio images
-  formData.otherVendors.forEach((section, sectionIndex) => {
-    section.vendors.forEach((vendor, vendorIndex) => {
-      // Check if vendor has portfolio image files
-      if (vendor.portfolioImages && Array.isArray(vendor.portfolioImages)) {
-        // Separate Files from strings (URLs)
-        const portfolioFiles = vendor.portfolioImages.filter(img => img instanceof File);
-        
-        // Add each portfolio image file
-        portfolioFiles.forEach((file, fileIndex) => {
-          formDataToSend.append(`otherVendor${sectionIndex}_vendor${vendorIndex}_portfolio${fileIndex}`, file);
-        });
-      }
-    });
   });
 
   console.log('FormData being sent:', {
     hasData: formDataToSend.has('data'),
     hasBannerImage: formDataToSend.has('bannerImage'),
-    blockImageCount: formData.blocks.filter(b => b.imageFile).length,
-    otherVendorSections: formData.otherVendors.length
+    mainVendorsCount: formData.mainVendors.length
   });
 
   // Log FormData contents for debugging
@@ -307,19 +319,17 @@ const handleSubmit = () => {
                 value.length > 100 ? `${value.substring(0, 100)}...` : value);
   }
 
-  if (editMode && homePageId) {
-    // Update existing homepage
-    dispatch(updateHomePage({
-      homePageId,
-      homePageData: formDataToSend
+  if (editMode && servicePageId) {
+    // Update existing service page
+    dispatch(updateServicePage({
+      servicePageId,
+      servicePageData: formDataToSend
     }));
   } else {
-    // Create new homepage
-    dispatch(createHomePage(formDataToSend));
+    // Create new service page
+    dispatch(createServicePage(formDataToSend));
   }
 };
-
-
 
   const handleCancel = () => {
     if (onClose) onClose();
@@ -341,7 +351,7 @@ const handleSubmit = () => {
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-xl font-semibold text-black">
-            {editMode ? 'Edit Page' : 'Add New Page'}
+            {editMode ? 'Edit Service Page' : 'Add New Service Page'}
           </h2>
           {loading && (
             <span className="text-sm text-gray-500">Saving...</span>
@@ -493,7 +503,7 @@ const handleSubmit = () => {
                   {/* Display the URL that will be used for location API */}
                   {selectedCity && formData.basicInfo.slugUrl && (
                     <div className="text-xs text-gray-500 mt-1">
-                      Location API URL: /api/homepages/location/{selectedCity._id}
+                      Service Page URL: /api/pages/service/slug/{formData.basicInfo.slugUrl}
                     </div>
                   )}
                 </div>
@@ -536,7 +546,7 @@ const handleSubmit = () => {
           )}
 
           {activeTab === 'Content' && (
-            <Content
+            <Content 
               contentData={formData.content}
               onUpdate={handleContentUpdate}
               disabled={loading}
@@ -544,39 +554,31 @@ const handleSubmit = () => {
           )}
 
           {activeTab === 'SEO' && (
-            <Seo
+            <Seo 
               seoData={formData.seo}
               onUpdate={handleSeoUpdate}
               disabled={loading}
             />
           )}
 
-          {activeTab === 'Blocks' && (
-            <Blocks
-              blocksData={formData.blocks}
-              onUpdate={handleBlocksUpdate}
-              disabled={loading}
-            />
-          )}
-
           {activeTab === 'Internal Links' && (
-            <InternalLinks
+            <InternalLinks 
               internalLinksData={formData.internalLinks}
               onUpdate={handleInternalLinksUpdate}
               disabled={loading}
             />
           )}
 
-          {activeTab === 'Other Vendors' && (
-            <OtherVendors
-              otherVendorsData={formData.otherVendors}
-              onUpdate={handleOtherVendorsUpdate}
+          {activeTab === 'Main Vendors' && (
+            <MainVendors 
+              otherVendorsData={formData.mainVendors}
+              onUpdate={handleMainVendorsUpdate}
               disabled={loading}
             />
           )}
 
           {activeTab === 'Reviews' && (
-            <Reviews
+            <Reviews 
               reviewsData={formData.reviews}
               onUpdate={(reviewsData) => {
                 setFormData(prev => ({
@@ -634,7 +636,7 @@ const handleSubmit = () => {
               'Saving...'
             ) : (
               <>
-                {editMode ? 'Update Page' : 'Create Page'}
+                {editMode ? 'Update Service Page' : 'Create Service Page'}
                 <svg
                   className="w-4 h-4"
                   fill="none"
@@ -657,4 +659,4 @@ const handleSubmit = () => {
   );
 };
 
-export default AddNewHomePage;
+export default AddNewServicePage;

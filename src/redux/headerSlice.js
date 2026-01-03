@@ -50,6 +50,12 @@ const headerSlice = createSlice({
         };
       }
     },
+    // Add action to update header image locally
+    updateHeaderImage: (state, action) => {
+      if (state.headerData) {
+        state.headerData.headerImage = action.payload;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -86,5 +92,5 @@ const headerSlice = createSlice({
   },
 });
 
-export const { clearError, clearSuccess, updateLocalHeader } = headerSlice.actions;
+export const { clearError, clearSuccess, updateLocalHeader, updateHeaderImage } = headerSlice.actions;
 export default headerSlice.reducer;

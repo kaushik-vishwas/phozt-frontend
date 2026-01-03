@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Seo = ({ seoData, onUpdate, disabled = false }) => {
+const ServiceSeo = ({ seoData, onUpdate, disabled = false }) => {
   const [formData, setFormData] = useState({
     metaTitle: seoData?.metaTitle || '',
     metaDescription: seoData?.metaDescription || '',
@@ -77,4 +77,4 @@ const Seo = ({ seoData, onUpdate, disabled = false }) => {
   );
 };
 
-export default Seo;
+export default ServiceSeo;

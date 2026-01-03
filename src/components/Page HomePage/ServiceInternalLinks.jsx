@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const InternalLinks = ({ internalLinksData, onUpdate, disabled = false }) => {
+const ServiceInternalLinks = ({ internalLinksData, onUpdate, disabled = false }) => {
     const [formData, setFormData] = useState({
         blockName: '',
         linkUrl: '',
@@ -240,4 +240,4 @@ const InternalLinks = ({ internalLinksData, onUpdate, disabled = false }) => {
     );
 };
 
-export default InternalLinks;
+export default ServiceInternalLinks;

@@ -1,6 +1,6 @@
 // PagesManagementDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Trash2, Edit, Image as ImageIcon, Plus, Upload } from 'lucide-react';
+import { Search, Camera, Trash2, Edit, Image as ImageIcon, Plus, Upload, Check } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchAllNavigations,
@@ -9,7 +9,8 @@ import {
   deleteSubService,
   fetchFullNavigation
 } from '../../redux/navigationSlice';
-import { getAllImages, uploadImage, deleteImage } from '../../redux/imageSlice';
+import { getAllImages } from '../../redux/imageSlice';
+import { fetchHeader, updateHeader } from '../../redux/headerSlice';
 import Sidebar from "../../components/Sidebar";
 import edit from "../../assets/Icons/edit.png";
 import deletee from "../../assets/Icons/delete.png";
@@ -23,8 +24,10 @@ import LogoAndQuote from "../../components/Page Management/LogoAndQuote";
 import KnowUs from "../../components/Page Management/KnowUs";
 import Services from '../../components/Page Management/Services';
 import NeededtoKnow from '../../components/Page Management/NeededtoKnow';
-import Logosettings from '../../components/Page Management/Logosettings';
 import SocialMediaLinks from '../../components/Page Management/SocialMediaLinks';
+import Logosettings from '../../components/Page Management/Logosettings';
+// import VendorLogin from '../../components/Page Management/VendorLoginSettings';
+import SecondaryFooter from '../../components/Page Management/secondaryFooter';
 import { useNavigate } from "react-router-dom";
 
 const PagesManagementDashboard = () => {
@@ -33,7 +36,7 @@ const PagesManagementDashboard = () => {
     
     // Redux state
     const { navigations, subServices, loading, error, success } = useSelector(state => state.navigation);
-    const { images: actionImages, loading: imagesLoading } = useSelector(state => state.image);
+    const { headerData, loading: headerLoading } = useSelector(state => state.header);
     
     const [activeHeaderTab, setActiveHeaderTab] = useState('navigation');
     const [activeFooterType, setActiveFooterType] = useState("primary");
@@ -41,22 +44,23 @@ const PagesManagementDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingNavigation, setEditingNavigation] = useState(null);
     const [editingSubService, setEditingSubService] = useState(null);
-    const [actionImage, setActionImage] = useState(null);
-    const [uploadingActionImage, setUploadingActionImage] = useState(false);
+    const [uploadingHeaderImage, setUploadingHeaderImage] = useState(false);
+    const [headerImageFile, setHeaderImageFile] = useState(null);
+    const [headerImagePreview, setHeaderImagePreview] = useState(null);
 
     // Fetch data on component mount
     useEffect(() => {
         dispatch(fetchAllNavigations());
         dispatch(fetchAllSubServices());
-        dispatch(getAllImages('action')); // Load action images
+        dispatch(fetchHeader()); // Fetch header data
     }, [dispatch]);
 
-    // Load action images when tab changes
+    // Update header image preview when headerData changes
     useEffect(() => {
-        if (activeHeaderTab === 'action') {
-            dispatch(getAllImages('action'));
+        if (headerData?.headerImage) {
+            setHeaderImagePreview(headerData.headerImage);
         }
-    }, [activeHeaderTab, dispatch]);
+    }, [headerData]);
 
     // Handle navigation service deletion
     const handleDeleteNavigation = async (id) => {
@@ -75,31 +79,39 @@ const PagesManagementDashboard = () => {
         }
     };
 
-    // Handle action image deletion
-    const handleDeleteActionImage = async (imageId) => {
-        if (window.confirm('Are you sure you want to delete this action image?')) {
-            await dispatch(deleteImage(imageId));
-            dispatch(getAllImages('action'));
-            setActionImage(null);
-        }
-    };
-
-    // Handle action image upload
-    const handleActionImageUpload = async (file) => {
+    // Handle header image upload
+    const handleHeaderImageUpload = async (file) => {
         if (!file) return;
         
-        setUploadingActionImage(true);
+        setUploadingHeaderImage(true);
+        setHeaderImageFile(file);
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setHeaderImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+        
         try {
-            const result = await dispatch(uploadImage({ file, folder: 'action' })).unwrap();
-            if (result.success) {
-                setActionImage(result.data);
-                dispatch(getAllImages('action'));
-                alert('Action image uploaded successfully!');
-            }
+            // Prepare current data for other fields
+            const currentLogoSettings = headerData?.logoSettings || {};
+            const currentVendorLoginButton = headerData?.vendorLoginButton || {};
+            
+            // Dispatch updateHeader action
+            await dispatch(updateHeader({ 
+                data: { 
+                    logoSettings: currentLogoSettings, 
+                    vendorLoginButton: currentVendorLoginButton
+                }, 
+                files: { headerImage: file }
+            })).unwrap();
+            
+            alert('Header image updated successfully!');
         } catch (err) {
-            alert('Failed to upload image: ' + err.message);
+            alert('Failed to upload header image: ' + err.message);
         } finally {
-            setUploadingActionImage(false);
+            setUploadingHeaderImage(false);
         }
     };
 
@@ -136,22 +148,46 @@ const PagesManagementDashboard = () => {
         setEditingSubService(null);
     };
 
-    // Handle save changes (if needed)
+    // Handle save changes
     const handleSaveChanges = () => {
         alert('Changes saved successfully!');
     };
 
-    // Handle file input for action image
-    const handleFileInputChange = (e) => {
+    // Handle file input for header image
+    const handleHeaderFileInputChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            handleActionImageUpload(file);
+            handleHeaderImageUpload(file);
             e.target.value = ''; // Reset input
         }
     };
 
-    // Filter action images
-    const actionImagesList = Array.isArray(actionImages) ? actionImages.filter(img => img.folder === 'action') : [];
+    // Clear header image
+    const handleClearHeaderImage = async () => {
+        if (window.confirm('Are you sure you want to remove the header image?')) {
+            try {
+                // Get current data
+                const currentLogoSettings = headerData?.logoSettings || {};
+                const currentVendorLoginButton = headerData?.vendorLoginButton || {};
+                
+                // Update with empty header image
+                await dispatch(updateHeader({ 
+                    data: { 
+                        logoSettings: currentLogoSettings, 
+                        vendorLoginButton: currentVendorLoginButton,
+                        headerImage: '' 
+                    }, 
+                    files: {} 
+                })).unwrap();
+                
+                setHeaderImagePreview(null);
+                setHeaderImageFile(null);
+                alert('Header image removed successfully!');
+            } catch (err) {
+                alert('Failed to remove header image: ' + err.message);
+            }
+        }
+    };
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -213,6 +249,14 @@ const PagesManagementDashboard = () => {
                                         <span>+</span>
                                         <span>Add Service</span>
                                     </button>
+
+                                    <button
+    onClick={() => navigate('/dropdown-management')}
+    className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-1"
+>
+    <span>+</span>
+    <span>Dropdown Management</span>
+</button>
                                 </div>
                             </div>
 
@@ -240,13 +284,23 @@ const PagesManagementDashboard = () => {
                                     </button>
 
                                     <button
-                                        onClick={() => setActiveHeaderTab('action')}
-                                        className={`pb-3 text-[14px] font-semibold border-b-2 transition-colors ${activeHeaderTab === 'action'
+                                        onClick={() => setActiveHeaderTab('images')}
+                                        className={`pb-3 text-[14px] font-semibold border-b-2 transition-colors ${activeHeaderTab === 'images'
                                             ? 'text-[#6331F9] border-[#6331F9]'
                                             : 'text-black border-transparent'
                                             }`}
                                     >
                                         Images
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveHeaderTab('vendor-login')}
+                                        className={`pb-3 text-[14px] font-semibold border-b-2 transition-colors ${activeHeaderTab === 'vendor-login'
+                                            ? 'text-[#6331F9] border-[#6331F9]'
+                                            : 'text-black border-transparent'
+                                            }`}
+                                    >
+                                        Vendor Login
                                     </button>
                                 </div>
 
@@ -360,137 +414,88 @@ const PagesManagementDashboard = () => {
 
                                 {activeHeaderTab === 'logo' && <Logosettings />}
                                 
-                                {activeHeaderTab === 'action' && (
+                                {activeHeaderTab === 'images' && (
                                     <div className="mt-5">
-                                        <div className="mb-6">
-                                            <h3 className="text-[18px] font-semibold text-black mb-3">Upload Call to Action Image</h3>
-                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                                                <div className="flex flex-col items-center justify-center space-y-4">
-                                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                                                        <Upload size={24} className="text-gray-400" />
-                                                    </div>
-                                                    <div>
-                                                        <input
-                                                            type="file"
-                                                            id="actionImageUpload"
-                                                            accept="image/*"
-                                                            onChange={handleFileInputChange}
-                                                            className="hidden"
-                                                        />
-                                                        <label
-                                                            htmlFor="actionImageUpload"
-                                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors mb-2 cursor-pointer inline-block"
-                                                        >
-                                                            {uploadingActionImage ? 'Uploading...' : 'Choose Image'}
-                                                        </label>
-                                                        <p className="text-sm text-gray-500">or drag and drop</p>
-                                                    </div>
-                                                    <p className="text-xs text-gray-500">
-                                                        Supports: JPG, PNG, WebP, GIF • Max 5MB
-                                                    </p>
+                                        {/* Header Image Section */}
+                                        <div className="mb-8 p-4 border border-gray-200 rounded-lg">
+                                            <h3 className="text-[18px] font-semibold text-black mb-4">Header Image Management</h3>
+                                            <div className="flex flex-col md:flex-row gap-6">
+                                                {/* Current Header Image Preview */}
+                                                <div className="md:w-1/3">
+                                                    <h4 className="text-[14px] font-medium text-gray-700 mb-2">Current Header Image</h4>
+                                                    {headerLoading ? (
+                                                        <div className="w-full h-40 bg-gray-100 rounded flex items-center justify-center">
+                                                            <p>Loading...</p>
+                                                        </div>
+                                                    ) : headerImagePreview ? (
+                                                        <div className="relative">
+                                                            <img
+                                                                src={headerImagePreview}
+                                                                alt="Header Preview"
+                                                                className="w-full h-40 object-cover rounded border border-gray-300"
+                                                            />
+                                                            <button
+                                                                onClick={handleClearHeaderImage}
+                                                                className="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-red-50 text-red-600"
+                                                                title="Remove header image"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full h-40 bg-gray-100 rounded flex flex-col items-center justify-center border-2 border-dashed border-gray-300">
+                                                            <ImageIcon size={32} className="text-gray-400 mb-2" />
+                                                            <p className="text-sm text-gray-500">No header image set</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        <div>
-                                            <h3 className="text-[18px] font-semibold text-black mb-3">Action Images</h3>
-                                            {imagesLoading ? (
-                                                <div className="text-center py-4">
-                                                    <p>Loading images...</p>
-                                                </div>
-                                            ) : actionImagesList.length === 0 ? (
-                                                <div className="text-center py-8 border border-gray-200 rounded-lg">
-                                                    <ImageIcon size={48} className="mx-auto text-gray-400 mb-3" />
-                                                    <p className="text-gray-500">No action images uploaded yet</p>
-                                                    <p className="text-sm text-gray-400 mt-1">Upload an image to get started</p>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {actionImagesList.map((image) => (
-                                                        <div
-                                                            key={image._id}
-                                                            className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                                        >
-                                                            <div className="aspect-video bg-gray-100 relative">
-                                                                <img
-                                                                    src={image.url || image.secure_url}
-                                                                    alt={image.originalName || 'Action Image'}
-                                                                    className="w-full h-full object-cover"
+                                                {/* Upload New Header Image */}
+                                                <div className="md:w-2/3">
+                                                    <h4 className="text-[14px] font-medium text-gray-700 mb-2">Upload New Header Image</h4>
+                                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                                                        <div className="flex flex-col items-center justify-center space-y-4">
+                                                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                                                                <Upload size={24} className="text-gray-400" />
+                                                            </div>
+                                                            <div>
+                                                                <input
+                                                                    type="file"
+                                                                    id="headerImageUpload"
+                                                                    accept="image/*"
+                                                                    onChange={handleHeaderFileInputChange}
+                                                                    className="hidden"
+                                                                    disabled={uploadingHeaderImage}
                                                                 />
-                                                                <div className="absolute top-2 right-2 flex gap-2">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            // Set as active action image
-                                                                            setActionImage(image);
-                                                                            alert('Image set as active call to action!');
-                                                                        }}
-                                                                        className="p-2 bg-white rounded-full shadow hover:shadow-md transition-shadow"
-                                                                        title="Set as active"
-                                                                    >
-                                                                        <Edit size={16} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteActionImage(image._id)}
-                                                                        className="p-2 bg-white rounded-full shadow hover:shadow-md transition-shadow"
-                                                                        title="Delete image"
-                                                                    >
-                                                                        <Trash2 size={16} className="text-red-600" />
-                                                                    </button>
-                                                                </div>
+                                                                <label
+                                                                    htmlFor="headerImageUpload"
+                                                                    className={`px-4 py-2 rounded transition-colors mb-2 cursor-pointer inline-block ${uploadingHeaderImage
+                                                                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                    }`}
+                                                                >
+                                                                    {uploadingHeaderImage ? 'Uploading...' : 'Choose Header Image'}
+                                                                </label>
+                                                                <p className="text-sm text-gray-500">or drag and drop</p>
                                                             </div>
-                                                            <div className="p-3 bg-white">
-                                                                <p className="text-sm font-medium truncate">
-                                                                    {image.originalName || image.filename}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500 mt-1">
-                                                                    Uploaded: {new Date(image.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                                {actionImage && actionImage._id === image._id && (
-                                                                    <div className="mt-2 inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                                                                        Active Image
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {actionImage && (
-                                            <div className="mt-6 p-4 border border-green-200 bg-green-50 rounded-lg">
-                                                <h4 className="text-[16px] font-semibold text-green-800 mb-2">Active Call to Action Image</h4>
-                                                <div className="flex items-start gap-4">
-                                                    <div className="w-32 h-20 rounded overflow-hidden flex-shrink-0">
-                                                        <img
-                                                            src={actionImage.url || actionImage.secure_url}
-                                                            alt="Active Action"
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className="font-medium">{actionImage.originalName || actionImage.filename}</p>
-                                                        <p className="text-sm text-gray-600 mt-1">
-                                                            This image is currently set as the active call to action button.
-                                                        </p>
-                                                        <div className="flex gap-2 mt-3">
-                                                            <button
-                                                                onClick={() => setActionImage(null)}
-                                                                className="px-3 py-1.5 border border-gray-300 text-sm font-medium hover:bg-gray-50 rounded"
-                                                            >
-                                                                Clear Active
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteActionImage(actionImage._id)}
-                                                                className="px-3 py-1.5 border border-red-300 text-sm font-medium text-red-600 hover:bg-red-50 rounded"
-                                                            >
-                                                                Delete Image
-                                                            </button>
+                                                            <p className="text-xs text-gray-500 text-center">
+                                                                Recommended: 1920×400 px • Supports: JPG, PNG, WebP • Max 5MB
+                                                            </p>
                                                         </div>
                                                     </div>
+                                                    {headerImageFile && (
+                                                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                                                            <div className="flex items-center gap-2">
+                                                                <Check size={16} className="text-green-600" />
+                                                                <span className="text-sm text-blue-800">
+                                                                    {headerImageFile.name} ready to upload
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
+                                        </div>
 
                                         <div className="flex justify-end mt-6">
                                             <button 
@@ -498,11 +503,13 @@ const PagesManagementDashboard = () => {
                                                 className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2"
                                             >
                                                 <img src={save} alt="save" className="w-4 h-4" />
-                                                <span>Save Action Images</span>
+                                                <span>Save Changes</span>
                                             </button>
                                         </div>
                                     </div>
                                 )}
+
+                                {activeHeaderTab === 'vendor-login' && <VendorLogin />}
                             </div>
                         </div>
 
@@ -535,49 +542,58 @@ const PagesManagementDashboard = () => {
                                     </button>
                                 </div>
 
-                                <div className="flex gap-4 border-b border-gray-200 overflow-x-auto mb-5">
-                                    {footerTabs.map((tab, idx) => (
+                               {activeFooterType === "primary" && (
+                                    <div className="flex gap-4 border-b border-gray-200 overflow-x-auto mb-5">
+                                        {footerTabs.map((tab, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => setActiveFooterTab(tab)}
                                             className={`pb-3 px-4 whitespace-nowrap text-[14px] font-semibold border-b-2 transition-colors ${activeFooterTab === tab
-                                                ? "text-[#6331F9] border-[#6331F9]"
-                                                : "text-black border-transparent"
-                                                }`}
+                                            ? "text-[#6331F9] border-[#6331F9]"
+                                            : "text-black border-transparent"
+                                            }`}
                                         >
                                             {tab}
                                         </button>
-                                    ))}
+                                        ))}
+                                    </div>
+                                )}
+
+                               <div className="mt-5">
+                                    {activeFooterType === "primary" && (
+                                    <>
+                                        {activeFooterTab === "Logo and quote" && <LogoAndQuote />}
+                                        {activeFooterTab === "Know Us" && <KnowUs />}
+                                        {activeFooterTab === "Services" && <Services />}
+                                        {activeFooterTab === "Needed to Know" && <NeededtoKnow />}
+                                        {activeFooterTab === "Social Media links" && <SocialMediaLinks />}
+                                    </>
+                                    )}
+                                    {activeFooterType === "secondary" && <SecondaryFooter />}
                                 </div>
 
-                                <div className="mt-5">
-                                    {activeFooterTab === "Logo and quote" && <LogoAndQuote />}
-                                    {activeFooterTab === "Know Us" && <KnowUs />}
-                                    {activeFooterTab === "Services" && <Services />}
-                                    {activeFooterTab === "Needed to Know" && <NeededtoKnow />}
-                                    {activeFooterTab === "Social Media links" && <SocialMediaLinks />}
-                                </div>
-
-                                <div className="flex flex-row gap-4 mt-5 justify-end">
+                              {activeFooterType === "primary" && (
+                                    <div className="flex flex-row gap-4 mt-5 justify-end">
                                     {activeFooterTab === "Services" || activeFooterTab === "Needed to Know" || activeFooterTab === "Social Media links" ? (
                                         <>
-                                            <button className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2">
-                                                <p>+</p>
-                                                <span>Add the form </span>
-                                            </button>
+                                        <button className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2">
+                                            <p>+</p>
+                                            <span>Add the form </span>
+                                        </button>
 
-                                            <button className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2">
-                                                <img src={save} alt="save" className="w-4 h-4" />
-                                                <span>Save changes</span>
-                                            </button>
-                                        </>
-                                    ) : (
                                         <button className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2">
                                             <img src={save} alt="save" className="w-4 h-4" />
                                             <span>Save changes</span>
                                         </button>
+                                        </>
+                                    ) : (
+                                        <button className="px-4 py-2 bg-white border border-black text-[16px] font-medium hover:bg-gray-50 flex items-center gap-2">
+                                        <img src={save} alt="save" className="w-4 h-4" />
+                                        <span>Save changes</span>
+                                        </button>
                                     )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
